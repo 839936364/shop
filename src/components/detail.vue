@@ -13,7 +13,13 @@
         <div class="wrap-box">
           <div class="left-925">
             <div class="goods-box clearfix">
-              <div class="pic-box"></div>
+              <div class="pic-box">
+                <el-carousel>
+                  <el-carousel-item v-for="(item,index) in imgList" :key="index">
+                    <img :src="item.original_path" alt>
+                  </el-carousel-item>
+                </el-carousel>
+              </div>
               <div class="goods-spec">
                 <h1>{{detailList.title}}</h1>
                 <p class="subtitle">{{detailList.zhaiyao}}</p>
@@ -125,6 +131,8 @@
                           sucmsg=" "
                           data-type="*10-1000"
                           nullmsg="请填写评论内容！"
+                          v-model.trim="comment"
+                          @keyup.enter="postComment"
                         ></textarea>
                         <span class="Validform_checktip"></span>
                       </div>
@@ -135,6 +143,7 @@
                           type="submit"
                           value="提交评论"
                           class="submit"
+                          @click="postComment"
                         >
                         <span class="Validform_checktip"></span>
                       </div>
@@ -159,9 +168,18 @@
                   </ul>
                   <div class="page-box" style="margin: 5px 0px 0px 62px;">
                     <div id="pagination" class="digg">
-                      <span class="disabled">« 上一页</span>
+                      <!-- <span class="disabled">« 上一页</span>
                       <span class="current">1</span>
-                      <span class="disabled">下一页 »</span>
+                      <span class="disabled">下一页 »</span>-->
+                      <el-pagination
+                        @size-change="handleSizeChange"
+                        @current-change="handleCurrentChange"
+                        :page-sizes="[10, 20, 30, 40,50]"
+                        :current-page="currentPage"
+                        :page-size="PageSize"
+                        layout="total, sizes, prev, pager, next, jumper"
+                        :total="totalCount"
+                      ></el-pagination>
                     </div>
                   </div>
                 </div>
@@ -175,13 +193,13 @@
                 <ul class="side-img-list" v-for="(item, index) in hotgoodslist" :key="index">
                   <li>
                     <div class="img-box">
-                      <a href="#/site/goodsinfo/90" class>
+                      <router-link :to="'/detail/'+item.id">
                         <img :src="item.img_url">
-                      </a>
+                      </router-link>
                     </div>
                     <div class="txt-box">
-                      <a href="#/site/goodsinfo/90" class>{{item.title}}</a>
-                      <span>{{item.add_time|dateFormat}}</span>
+                      <router-link :to="'/detail/'+item.id">{{item.title}}</router-link>
+                      <span>{{item.add_time|FormatDate}}</span>
                     </div>
                   </li>
                 </ul>
@@ -198,13 +216,19 @@
 export default {
   data() {
     return {
-      id: this.$route.params.id,
       detailList: [],
       hotgoodslist: [],
       index: 1,
       replylist: {},
-      page: 1,
-      pageSize: 10
+      currentPage: 1,
+      // 总条数，根据接口获取数据长度(注意：这里不能为空)
+      totalCount: 0,
+      // 个数选择器（可修改）
+      pageIndex: 1,
+      // 默认每页显示的条数（可修改）
+      PageSize: 10,
+      imgList: [],
+      comment: ""
     };
   },
   created() {
@@ -214,30 +238,93 @@ export default {
   methods: {
     getDetail() {
       this.$http
-        .get("http://111.230.232.110:8899/site/goods/getgoodsinfo/" + this.id)
+        .get(
+          `http://111.230.232.110:8899/site/goods/getgoodsinfo/${
+            this.$route.params.id
+          }`
+        )
         .then(res => {
           this.detailList = res.data.message.goodsinfo;
           this.hotgoodslist = res.data.message.hotgoodslist;
+          this.imgList = res.data.message.imglist;
         });
     },
+    // 获取评论的
     getreplylist() {
       this.$http
         .get(
           "http://111.230.232.110:8899/site/comment/getbypage/goods/" +
-            this.id +
+            `${this.$route.params.id}` +
             "?pageIndex=" +
-            this.page +
+            this.pageIndex +
             "&" +
             "pageSize=" +
-            this.pageSize
+            this.PageSize
         )
         .then(res => {
           this.replylist = res.data.message;
+          this.totalCount = res.data.totalcount;
         });
+    },
+
+    // 评论的相关代码
+    postComment() {
+      if (this.comment == "") {
+        return;
+      } else {
+        this.$http
+          .post(
+            `http://111.230.232.110:8899/site/validate/comment/post/goods/${
+              this.$route.params.id
+            }`,
+            {
+              commenttxt: this.comment
+            }
+          )
+          .then(res => {
+            if (res) {
+              this.getreplylist();
+            }
+          });
+        this.comment = "";
+      }
+    },
+    handleSizeChange(size) {
+      this.PageSize = size;
+      this.getreplylist();
+    },
+    // 显示第几页
+    handleCurrentChange(val) {
+      this.pageIndex = val;
+      // 切换页码时，要获取每页显示的条数
+      this.getreplylist();
+    }
+  },
+  watch: {
+    $route() {
+      this.getDetail();
+      this.getreplylist();
     }
   }
 };
 </script>
 
 <style>
+.pic-box {
+  width: 395px;
+  height: 320px;
+}
+.pic-box .el-carousel {
+  width: 100%;
+  height: 100%;
+}
+.pic-box .el-carousel__container {
+  width: 100%;
+  height: 100%;
+}
+.pic-box .el-carousel__container img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 </style>
